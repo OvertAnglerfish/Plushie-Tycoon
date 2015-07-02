@@ -1,0 +1,609 @@
+// ==UserScript==
+// @name         Plushie Tycoon AP
+// @namespace    OvertAnglerfish.org
+// @version      0.01
+// @description  An Autoplayer for the game Plushie Tycoon on Neopets
+// @author       Phil
+// @include      http://www.neopets.com/games/tycoon/*
+// @require      http://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js
+// @grant        GM_setValue
+// @grant        GM_xmlhttpRequest
+// @grant        GM_getValue
+// @grant        GM_log
+// ==/UserScript==
+
+
+if(GM_getValue("cashOnHand") === undefined){
+    GM_setValue("cashOnHand", "Cash on Hand: xxxx NP");
+}
+
+GM_xmlhttpRequest({
+  method: "GET",
+  url: "http://www.neopets.com/games/tycoon/index.phtml",
+  onload: function(response) {
+    GM_setValue("cashOnHand",response.responseText);
+  }
+});
+
+var $coh = GM_getValue("cashOnHand");
+var $start = $coh.indexOf("Cash on Hand: ");
+$start = $start + 13;
+var $end = $coh.indexOf("<p>Plushie Tycoon time");
+
+var $cash = $coh.substring($start,$end);
+
+//Some useful variables
+var MATERIAL_URLS = ["http://www.neopets.com/games/tycoon/materials_buy.phtml?item=0-3&catgor=0&factor=20&matvar=24",
+                     "http://www.neopets.com/games/tycoon/materials_buy.phtml?item=1-0&catgor=1&factor=20&matvar=12",
+                     "http://www.neopets.com/games/tycoon/materials_buy.phtml?item=2-0&catgor=2&factor=20&matvar=26",
+                     "http://www.neopets.com/games/tycoon/materials_buy.phtml?item=3-0&catgor=3&factor=20&matvar=16"];
+
+var MATERIALS = ["Green", "NeoCotton", "Rare Gems", "Velvet bags"];
+
+var PLUSHIE_TYPES = ["Draik", "Elephante", "Kougra", "Lutari"];
+var PLUSHIE_CODES = [43, 22, 36, 53];
+
+var MATERIAL_QUANTITIES = [4, 1, 1, 1];
+var MATERIAL_LOCATIONS = [3, 0, 0, 0];
+
+var LANDING_PAGES = ["http://www.neopets.com/games/tycoon/materials.phtml?Cat=0",
+                     "http://www.neopets.com/games/tycoon/materials.phtml?Cat=1",
+                     "http://www.neopets.com/games/tycoon/materials.phtml?Cat=2",
+                     "http://www.neopets.com/games/tycoon/materials.phtml?Cat=3"];
+
+var RENTS = ["http://www.neopets.com/games/tycoon/factory.phtml?pay=1",
+             "http://www.neopets.com/games/tycoon/store.phtml?pay=1",
+             "http://www.neopets.com/games/tycoon/warehouse.phtml?pay=1",
+             "http://www.neopets.com/games/tycoon/index.phtml"];
+
+var MAIN_PAGE = "http://www.neopets.com/games/tycoon/index.phtml";
+var START_JOB_PAGE = "http://www.neopets.com/games/tycoon/factory.phtml?start=1";
+var HIRE_WORKERS_PAGE = "http://www.neopets.com/games/tycoon/factory.phtml?personnel=2&hire=1";
+var FIRE_WORKERS_PAGE = "http://www.neopets.com/games/tycoon/factory.phtml?fire_all=1";
+
+var HIRE_TRAINEES = "http://www.neopets.com/games/tycoon/workers_hire.phtml?worker=2";
+var HIRE_MANAGERS = "http://www.neopets.com/games/tycoon/workers_hire.phtml?worker=4";
+
+var WAREHOUSE = "http://www.neopets.com/games/tycoon/warehouse.phtml";
+
+var buyCounterMax = 5;
+var rentCounterMax = 4;
+var startJobCounterMax = 4;
+var hireCounterMax = 12;
+var plushieMakerCounterMax = 4;
+var shipCounterMax = 2;
+var standbyCounterMax = 2;
+
+var status = GM_getValue("status");
+if(status === undefined){
+    GM_setValue("status", "Standby");
+}
+var buyCounter = GM_getValue("buyCounter");
+if(buyCounter === undefined){
+    GM_setValue("buyCounter", buyCounterMax);
+}
+var bought = GM_getValue("bought");
+if(bought === undefined){
+    GM_setValue("bought", 0);
+}
+var rentCounter = GM_getValue("rentCounter");
+if(rentCounter === undefined){
+    GM_setValue("rentCounter", rentCounterMax);
+}
+var startJobCounter = GM_getValue("startJobCounter");
+if(startJobCounter === undefined){
+    GM_setValue("startJobCounter", startJobCounterMax);
+}
+var hireCounter = GM_getValue("hireCounter");
+if(hireCounter === undefined){
+    GM_setValue("hireCounter", hireCounterMax);
+}
+var jobsToMake = GM_getValue("jobsToMake");
+if(jobsToMake === undefined){
+    GM_setValue("jobsToMake", 0);
+}
+var shipCounter = GM_getValue("shipCounter");
+if(shipCounter === undefined){
+    GM_setValue("shipCounter", shipCounterMax);
+}
+var plushieMakerCounter = GM_getValue("plushieMakerCounter");
+if(plushieMakerCounter === undefined){
+    GM_setValue("plushieMakerCounter", plushieMakerCounterMax);
+}
+var standbyCounter = GM_getValue("standbyCounter");
+if(standbyCounter === undefined){
+    GM_setValue("standbyCounter", standbyCounterMax);
+}
+
+/*var buyButton=document.createElement("input");
+buyButton.type="button";
+buyButton.value="Make 8 jobs";
+buyButton.onclick = makePlushies;*/
+
+var rentButton=document.createElement("input");
+rentButton.type="button";
+rentButton.value="Pay Rents";
+rentButton.onclick = payRents;
+
+/*var startJobButton=document.createElement("input");
+startJobButton.type="button";
+startJobButton.value="Start a Job";
+startJobButton.onclick = startJob;*/
+
+/*var hireWorkersButton=document.createElement("input");
+hireWorkersButton.type="button";
+hireWorkersButton.value="Hire Workers";
+hireWorkersButton.onclick = hireWorkers;*/
+
+/*var fireWorkersButton=document.createElement("input");
+fireWorkersButton.type="button";
+fireWorkersButton.value="Fire Workers";
+fireWorkersButton.onclick = fireWorkers;*/
+
+var resetButton=document.createElement("input");
+resetButton.type="button";
+resetButton.value="Reset";
+resetButton.onclick = reset;
+
+/*var shipButton=document.createElement("input");
+shipButton.type="button";
+shipButton.value="Ship Plushies";
+shipButton.onclick = shipPlushies;*/
+
+var time = getNST();
+
+if(window.location == MAIN_PAGE)
+{
+    if(time[1] < 10)
+    {
+        time[1] = "0" + time[1];
+    }
+    $("img[alt='Plushie Tycoon']").after("<br><br>", rentButton, resetButton);
+}
+
+if(GM_getValue("lastStandbyTime") === undefined){
+    var t = getNST();
+    GM_setValue("lastStandbyTime", t[1]);
+}
+
+function wait(func) {
+  window.setTimeout(func, 500 + (500 * Math.random()));
+}
+
+function getNST(){
+	$nst = $("#nst").text();
+	if($("#nst:contains('pm')").length > 0){
+		$pm = 1;
+	}
+	else{
+		$pm = 0;
+	}
+	$nstSplit = $nst.split(":");
+	$nstSplit[0] = parseInt($nstSplit[0]);
+	$nstSplit[1] = parseInt($nstSplit[1]);
+	if($pm == 1){
+		$nstSplit[0] = $nstSplit[0] + 12;
+	}
+	return $nstSplit;
+}
+
+function getAllPrices(){
+	var prices = new Array(4);
+	for(i = 0; i < 4; i++){
+		prices[i] = getPrice(i);
+	}
+	return prices;
+}
+
+function getPrice(cat){
+    $url = "http://www.neopets.com/games/tycoon/materials.phtml?Cat=" + cat;
+	GM_xmlhttpRequest({
+		method: "GET",
+		url: $url,
+		onload: function(response) {
+			GM_setValue(cat,response.responseText);
+	  	}
+	});
+	var source = GM_getValue(cat);
+	var cost = source.indexOf("Cost per");
+	var $start = source.indexOf("<td align='center'><b>",cost);
+	$start = $start + 22 + 38 * MATERIAL_LOCATIONS[cat];
+    //GM_log("start: " + $start);
+	var $end = source.indexOf("</b></td>",$start);
+	var price = source.substring($start,$end);
+    //GM_log("price " + cat + ": " + price);
+	price = price.replace(' NP','');
+	price = price.replace(',','');
+	return price;
+}
+
+function buyMaterials()
+{
+    GM_setValue("buyCounter",0);
+    GM_setValue("bought", 0);
+    GM_setValue("status", "Buying Materials");
+    window.location = LANDING_PAGES[0];
+}
+function buyMaterialsHelper()
+{
+    if(buyCounter >= 0 && buyCounter < buyCounterMax-1 && bought == 2)
+    {
+        wait(function(){window.location = LANDING_PAGES[buyCounter];});
+        GM_setValue("bought", 0);
+    }
+    else if(bought == 0)
+    {
+        wait(function(){$('b:contains(' + MATERIALS[buyCounter] + ')').click();});
+        GM_setValue("bought", 1);
+    }
+    else if(bought == 1 && window.location.toString().indexOf("materials_buy.phtml?") > -1)
+    {
+        $('select').val(MATERIAL_QUANTITIES[buyCounter]).change();
+        if(buyCounter == 2)
+        {
+            var pet = Math.floor(Math.random() * PLUSHIE_TYPES.length);
+            GM_setValue("plushieCode", pet);
+            $('select[name="pickpet"]').val(PLUSHIE_CODES[pet]).change();
+        }
+        wait(function() {
+            $('input[name="purchaser"]').click();
+        });
+        GM_setValue("buyCounter", buyCounter+1);
+        GM_setValue("bought", 2);
+    }
+    else if(buyCounter == 4)
+    {
+        window.location = MAIN_PAGE;
+        GM_setValue("buyCounter", buyCounter+1);
+    }
+}
+
+function startJob()
+{
+    GM_setValue("startJobCounter", 0);
+    GM_setValue("status", "Starting Jobs");
+    wait(function() {window.location = START_JOB_PAGE;});
+}
+
+function startJobHelper()
+{
+    if(startJobCounter < startJobCounterMax)
+    {
+        if(startJobCounter == 0)
+        {
+            wait(function() {window.location = START_JOB_PAGE;});
+        }
+        if(startJobCounter == 1)
+        {
+            var pet = GM_getValue("plushieCode");
+            $('select[name="pickpet"]').val(PLUSHIE_TYPES[pet]).change();
+        }
+        else if(startJobCounter == 2)
+        {
+            if($('b:contains("here")').length > 0)
+            {                
+                startJobCounter = -1;
+                wait(function(){$('b:contains("here")').click();});
+            }
+            else
+            {
+                $('input[type="radio"]').prop('checked','checked');
+                wait(function() {$('input[name="submitjob"]').click();});
+            }
+        }
+        else if(startJobCounter == 3)
+        {
+            
+            var cash = $cash.replace(' NP','');
+            cash = cash.replace(',','');
+            cash = parseInt(cash);
+            cash = cash - 10000;
+            var totalCost = parseInt(getPrice(0))*4 + parseInt(getPrice(1)) + parseInt(getPrice(2)) + parseInt(getPrice(3));
+            var jobs = Math.floor(cash/totalCost);
+            $('select[name="pickpet"]').val(1).change();
+            GM_setValue("jobsToMake", jobs);
+            wait(function() {$('input[value="Start Job"]').click();});
+        }
+        GM_setValue("startJobCounter", startJobCounter + 1);
+    }
+}
+
+function fireWorkers()
+{
+    wait(function() {window.location = FIRE_WORKERS_PAGE;});
+}
+
+function hireWorkers()
+{
+    GM_setValue("status", "Hiring Workers");
+    GM_setValue("hireCounter", 0);
+    wait(function() {window.location = HIRE_WORKERS_PAGE;});
+}
+
+function hireWorkersHelper()
+{
+    hireCounter = GM_getValue("hireCounter");
+    if(hireCounter < hireCounterMax)
+    {
+        if(hireCounter == 0)
+        {
+            wait(function() {window.location = HIRE_WORKERS_PAGE;});
+        }
+        if(hireCounter == 1)
+        {
+            wait(function(){$('b:contains("Trainees")').click();});
+        }
+        else if(hireCounter == 2 && window.location == HIRE_TRAINEES)
+        {
+            $('select').val(250).change();
+            wait(function() {$('input[name="purchaser"]').click();});
+        }
+        else if(hireCounter == 3 || hireCounter == 6 || hireCounter == 9)
+        {
+            wait(function() {window.location = HIRE_WORKERS_PAGE;});
+        }
+        else if(hireCounter == 4 || hireCounter == 7)
+        {
+            wait(function(){$('b:contains("Managers")').click();});
+        }
+        else if((hireCounter == 5 || hireCounter == 8) && window.location == HIRE_MANAGERS)
+        {
+            $('select').val(10).change();
+            wait(function() {$('input[name="purchaser"]').click();});
+        }
+        else if(hireCounter == 10)
+        {
+            wait(function(){$('b:contains("Managers")').click();});
+        }
+        else if(hireCounter == 11 && window.location == HIRE_MANAGERS)
+        {
+            $('select').val(4).change();
+            wait(function() {$('input[name="purchaser"]').click();});
+        }
+        GM_setValue("hireCounter", hireCounter + 1);
+    }
+}
+
+function payRents()
+{
+    GM_setValue("status", "Paying Rents");
+    GM_setValue("rentCounter", 0);
+    window.location = MAIN_PAGE;
+}
+
+function payRentsHelper()
+{
+    if(rentCounter < rentCounterMax)
+    {
+        wait(function() {window.location = RENTS[rentCounter];});
+        GM_setValue("rentCounter", rentCounter+1);
+    }
+}
+
+function makePlushies()
+{
+    var cash = $cash.replace(' NP','');
+    cash = cash.replace(',','');
+    cash = parseInt(cash);
+    cash = cash - 10000;
+    var totalCost = parseInt(getPrice(0))*4 + parseInt(getPrice(1)) + parseInt(getPrice(2)) + parseInt(getPrice(3));
+    var gemPrice = parseInt(getPrice(2));
+    var jobsToMake = 0;
+    if(totalCost * 4 > cash || totalCost > 4000)
+    {
+        //GM_log(cash);
+        //GM_log(totalCost);
+        GM_log("Jobs too expensive rn");
+        var t = getNST();
+        var lastStandbyTime = GM_getValue("lastStandbyTime");
+        if((t[1] - lastStandbyTime + 60)% 60 >= 10)
+        {
+            GM_setValue("lastStandbyTime", t[1]);
+            GM_setValue("standbyCounter", 0);
+        }
+    }
+    else
+    {
+        GM_setValue("plushieMakerCounter", 0);
+        //GM_log("Jobs would have been made");
+        var jobs = Math.floor(cash/totalCost);
+        if(jobs > 18)
+        {
+            jobs = 18;
+        }
+        //GM_log("jobsToMake: " + jobs);
+        GM_setValue("jobsToMake", jobs);
+        window.location = MAIN_PAGE;
+    }
+}
+
+function makePlushiesHelper()
+{
+    if(plushieMakerCounter < plushieMakerCounterMax)
+    {
+        if(plushieMakerCounter == 0)
+        {
+            fireWorkers();
+            GM_setValue("plushieMakerCounter", 1);
+        }
+        else if(plushieMakerCounter == 1)
+        {
+            hireWorkers();
+            GM_setValue("plushieMakerCounter", 2);
+        }
+        else if(plushieMakerCounter == 2 && hireCounter == 12 && startJobCounter == 4)
+        {
+            if(jobsToMake > 0)
+            {
+                buyMaterials();
+                GM_setValue("plushieMakerCounter", 3);
+            }
+            else
+            {
+                GM_setValue("plushieMakerCounter", 4);
+            }
+        }
+        else if(plushieMakerCounter == 3 && buyCounter == 5)
+        {
+            startJob();
+            GM_setValue("plushieMakerCounter", 2);
+        }
+    }
+}
+
+var totalCost = parseInt(getPrice(0))*4 + parseInt(getPrice(1)) + parseInt(getPrice(2)) + parseInt(getPrice(3));
+
+$(".sidebarModule:last").css("margin-bottom","7px");
+
+var module = '<div class="sidebarModule" style="margin-bottom: 7px;"><table width="158" cellpadding="2" cellspacing="0" border="0" class="sidebarTable">';
+module += '<tr><td valign="middle" class="sidebarHeader medText"><a href="http://www.neopets.com/games/tycoon/index.phtml">Plushie Tycoon</a></td></tr>';
+module += '<tr><td class="neofriend" align="center"><b>Cash on Hand:</b> ' + $cash;
+var currstatus = GM_getValue("status");
+module += '<br><b>Status:</b> ' + currstatus;
+module += '<br><b>Price per job:</b> ' + totalCost;
+module += "<br><b>Last refresh:</b> " + time[0] + ":" +time[1];
+module += '</td></tr></table></div>';
+
+$(".sidebar").append(module);
+
+$(".sidebarHeader:contains('Plushie Tycoon')").click(function(){
+	$("tr:contains('Cash on Hand'):last").toggle();
+});
+
+function shipPlushies()
+{
+    GM_setValue("status", "Shipping Plushies");
+    GM_setValue("shipCounter", 0);
+    window.location = WAREHOUSE;
+}
+
+function shipPlushiesHelper()
+{
+    if(shipCounter == 0)
+    {
+        var checkboxes = $(":checkbox");
+        var cash = $cash.replace(' NP','');
+		cash = cash.replace(',','');
+        GM_log("cash = " + parseInt(cash));
+        cash = parseInt(cash);
+        if(checkboxes.length == 0)
+        {
+            shipCounter = 1;
+            wait(function() {window.location = MAIN_PAGE;});
+        }
+        else //if(checkboxes.length * 278 < parseInt(cash) - 800)
+        {
+            cash -= 1000;
+            var jobsToShip = checkboxes.length;
+            if(jobsToShip * 278 > cash)
+            {
+                jobsToShip = Math.floor(cash/278);
+            }
+            checkboxes = $(":checkbox:lt("+jobsToShip+")");
+            checkboxes.prop('checked', true);
+            wait(function() {$('input[name="submit"]').click();});
+        }
+        GM_setValue("shipCounter", shipCounter +1);
+    }
+    else if(shipCounter == 1)
+    {
+        window.location = MAIN_PAGE;
+        GM_setValue("shipCounter", shipCounter +1);
+    }
+}
+
+function standbyTasks()
+{
+    if(standbyCounter < standbyCounterMax)
+    {
+        if(standbyCounter == 0)
+        {
+            shipPlushies();
+            GM_setValue("standbyCounter", 1);
+        }
+        else if(standbyCounter == 1 && shipCounter == shipCounterMax)
+        {
+            GM_xmlhttpRequest({
+                method: "GET",
+                url: "http://www.neopets.com/games/tycoon/factory.phtml?exist=1",
+                onload: function(response) {
+                    GM_setValue("currentJobs",response.responseText);
+                }
+            });
+            var currentJobs = GM_getValue("currentJobs");
+            GM_log(currentJobs);
+            GM_log("Are there jobs?" + currentJobs.indexOf("<b>0</b>"));
+            if(currentJobs.indexOf("<b>0</b>") == -1)
+            {
+                fireWorkers();
+            }
+            GM_setValue("standbyCounter", 2);
+        }
+    }
+}
+
+function reset()
+{
+    GM_setValue("status", "Standby");
+    GM_setValue("buyCounter", buyCounterMax);
+    GM_setValue("bought", 0);
+    GM_setValue("rentCounter", rentCounterMax);
+    GM_setValue("startJobCounter", startJobCounterMax);
+    GM_setValue("hireCounter", hireCounterMax);
+    GM_setValue("jobsToMake", 0);
+    GM_setValue("plushieMakerCounter", plushieMakerCounterMax);
+    GM_setValue("standbyCounter", standbyCounterMax);
+    window.location = MAIN_PAGE;
+    alert("Program reset.");
+}
+
+function main()
+{
+    buyCounter = GM_getValue("buyCounter");
+    bought = GM_getValue("bought");
+    rentCounter = GM_getValue("rentCounter");
+    startJobCounter = GM_getValue("startJobCounter");
+    hireCounter = GM_getValue("hireCounter");
+    jobsToMake = GM_getValue("jobsToMake");
+    plushieMakerCounter = GM_getValue("plushieMakerCounter");
+    standbyCounter = GM_getValue("standbyCounter");
+    var lastStandbyTime = GM_getValue("lastStandbyTime");
+    
+    GM_xmlhttpRequest({
+        method: "GET",
+        url: "http://www.neopets.com/games/tycoon/factory.phtml?exist=1",
+        onload: function(response) {
+            GM_setValue("currentJobs",response.responseText);
+        }
+    });
+    var currentJobs = GM_getValue("currentJobs");
+    //GM_log(currentJobs);
+    GM_log("Are there jobs? " + currentJobs.indexOf("<b>0</b>"));
+    
+    GM_log("lastStandbyTime: " + lastStandbyTime);
+    GM_log("buyCounter: " + buyCounter);
+    GM_log("bought: " + bought);
+    GM_log("rentCounter: " + rentCounter);
+    GM_log("startJobCounter: " + startJobCounter);
+    GM_log("hireCounter: " + hireCounter);
+    GM_log("jobsToMake: " + jobsToMake);
+    GM_log("plushieMakerCounter: " + plushieMakerCounter);
+    GM_log("shipCounter: " + shipCounter);
+    GM_log("standbyCounter: " + standbyCounter);
+    
+    shipPlushiesHelper();
+    payRentsHelper();
+    makePlushiesHelper();
+    buyMaterialsHelper();
+    startJobHelper();
+    hireWorkersHelper();
+    standbyTasks();
+    
+    if(plushieMakerCounter == plushieMakerCounterMax && shipCounter == shipCounterMax && standbyCounter == standbyCounterMax)
+    {
+        makePlushies();
+    }
+    window.setTimeout(function(){window.location = MAIN_PAGE; GM_setValue("status", "Standby");}, 240000 + (60000 * Math.random()));
+}
+
+main();
