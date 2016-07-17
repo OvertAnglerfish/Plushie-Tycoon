@@ -1,1 +1,0 @@
-const testVariable = "it works!";
